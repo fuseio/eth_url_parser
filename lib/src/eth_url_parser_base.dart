@@ -1,6 +1,8 @@
 library eth_url_parser;
 
 import 'package:decimal/decimal.dart';
+
+import 'package:eth_url_parser/src/models/transaction_request.dart';
 import 'package:eth_url_parser/src/query_string.dart';
 
 class EthUrlParser {
@@ -9,9 +11,9 @@ class EthUrlParser {
   ///
   /// @param  {string} uri string.
   ///
-  /// @return {object}
+  /// @return [TransactionRequest]
   ///
-  static Map<String, dynamic> parse(String uri) {
+  static TransactionRequest parse(String uri) {
     if (uri.substring(0, 9) != 'ethereum:') {
       throw Exception('Not an Ethereum URI');
     }
@@ -56,7 +58,7 @@ class EthUrlParser {
     }
 
     if (data[0].group(3) != null) {
-      obj.putIfAbsent('chain_id', () => data[0].group(3));
+      obj.putIfAbsent('chainId', () => int.parse(data[0].group(3)!));
     }
 
     if (data[0].group(4) != null) {
@@ -64,7 +66,7 @@ class EthUrlParser {
     }
 
     if (params.isNotEmpty) {
-      obj.putIfAbsent('parameters', () => params);
+      obj.putIfAbsent('parameters', () => Map<String, dynamic>.from(params));
       final amountKey = obj['functionName'] == 'transfer' ? 'uint256' : 'value';
 
       if (obj['parameters'][amountKey] != null) {
@@ -78,35 +80,36 @@ class EthUrlParser {
         }
       }
     }
-    return obj;
+
+    return TransactionRequest.fromJson(obj);
   }
 
   ///
   /// Builds a valid Ethereum URI based on the initial parameters
-  /// @param  {object} data
+  /// @param  [TransactionRequest]
   ///
   /// @return {string}
   ///
-  static String build({
-    scheme = 'ethereum',
-    targetAddress,
-    prefix,
-    chainId,
-    functionName,
-    parameters,
-  }) {
+  static String build(TransactionRequest transactionRequest) {
     dynamic query;
-    if (parameters != null) {
-      final amountKey = functionName == 'transfer' ? 'uint256' : 'value';
-      if (parameters[amountKey] != null) {
+    if (transactionRequest.parameters.isNotEmpty) {
+      final amountKey =
+          transactionRequest.functionName == 'transfer' ? 'uint256' : 'value';
+      if (transactionRequest.parameters[amountKey] != null) {
         // This is weird. Scientific notation in JS is usually 2.014e+18
         // but the EIP 681 shows no "+" sign ¯\_(ツ)_/¯
         // source: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-681.md#semantics
-        final int amount = int.parse(parameters[amountKey], radix: 10);
-        parameters[amountKey] = amount
+        final int amount =
+            int.parse(transactionRequest.parameters[amountKey], radix: 10);
+        final String parsed = amount
             .toStringAsExponential()
             .replaceAll('+', '')
             .replaceAll('e0', '');
+        transactionRequest = transactionRequest.copyWith(
+            parameters: Map.from({
+          ...transactionRequest.parameters,
+          amountKey: parsed,
+        }));
         if (!amount.toDouble().isFinite) {
           throw Exception('Invalid amount');
         }
@@ -115,11 +118,12 @@ class EthUrlParser {
         }
       }
       query = Uri(
-        queryParameters: parameters,
+        queryParameters: transactionRequest.parameters,
       ).toString();
     }
     final uri =
-        '$scheme:${prefix != null ? prefix + '-' : ''}$targetAddress${chainId != null ? '@$chainId' : ''}${functionName != null ? '/$functionName' : ''}${query ?? ''}';
+        '${transactionRequest.scheme}:${transactionRequest.prefix != null ? '${transactionRequest.prefix}-' : ''}${transactionRequest.targetAddress}${transactionRequest.chainId != null ? '@${transactionRequest.chainId}' : ''}${transactionRequest.functionName != null ? '/${transactionRequest.functionName}' : ''}${query ?? ''}';
+
     return uri;
   }
 }
