@@ -1,7 +1,5 @@
 library eth_url_parser;
 
-import 'package:decimal/decimal.dart';
-
 import 'package:eth_url_parser/src/models/transaction_request.dart';
 import 'package:eth_url_parser/src/query_string.dart';
 
@@ -70,12 +68,18 @@ class EthUrlParser {
       final amountKey = obj['functionName'] == 'transfer' ? 'uint256' : 'value';
 
       if (obj['parameters'][amountKey] != null) {
-        final Decimal amount = Decimal.parse(obj['parameters'][amountKey]);
-        obj['parameters'][amountKey] = amount.toString();
+        final num amount = num.parse(obj['parameters'][amountKey]);
+        String value;
+        if (amount.toString().endsWith('.0')) {
+          value = amount.toString().split('.').first;
+        } else {
+          value = amount.toString();
+        }
+        obj['parameters'][amountKey] = value;
         if (!amount.toDouble().isFinite) {
           throw Exception('Invalid amount');
         }
-        if (amount < Decimal.zero) {
+        if (amount < 0) {
           throw Exception('Invalid amount');
         }
       }
@@ -99,17 +103,17 @@ class EthUrlParser {
         // This is weird. Scientific notation in JS is usually 2.014e+18
         // but the EIP 681 shows no "+" sign ¯\_(ツ)_/¯
         // source: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-681.md#semantics
-        final int amount =
-            int.parse(transactionRequest.parameters[amountKey], radix: 10);
-        final String parsed = amount
+        final num amount = num.parse(transactionRequest.parameters[amountKey]);
+        final String atomicUnits = amount
             .toStringAsExponential()
             .replaceAll('+', '')
             .replaceAll('e0', '');
         transactionRequest = transactionRequest.copyWith(
-            parameters: Map.from({
-          ...transactionRequest.parameters,
-          amountKey: parsed,
-        }));
+          parameters: Map.from({
+            ...transactionRequest.parameters,
+            amountKey: atomicUnits,
+          }),
+        );
         if (!amount.toDouble().isFinite) {
           throw Exception('Invalid amount');
         }
