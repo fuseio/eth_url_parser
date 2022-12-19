@@ -149,15 +149,16 @@ void main() {
       );
 
       expect(
-          EthUrlParser.build(
-            TransactionRequest(
-              scheme: 'ethereum',
-              targetAddress: '0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD',
-              chainId: 1,
-            ),
+        EthUrlParser.build(
+          TransactionRequest(
+            scheme: 'ethereum',
+            targetAddress: '0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD',
+            chainId: 1,
           ),
-          'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD@1',
-          reason: 'Can build a URL with chain id');
+        ),
+        'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD@1',
+        reason: 'Can build a URL with chain id',
+      );
 
       expect(
         EthUrlParser.build(
