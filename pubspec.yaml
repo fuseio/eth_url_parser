@@ -1,7 +1,7 @@
 name: eth_url_parser
 description: Module that supports parsing / parsing of all the different
   ethereum standard urls
-version: 0.0.4
+version: 0.0.5
 repository: https://github.com/fuseio/eth_url_parser
 homepage: https://chargeweb3.com/
 

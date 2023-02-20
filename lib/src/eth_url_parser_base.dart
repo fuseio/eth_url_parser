@@ -3,14 +3,19 @@ library eth_url_parser;
 import 'package:eth_url_parser/src/models/transaction_request.dart';
 import 'package:eth_url_parser/src/query_string.dart';
 
+/// A Dart library for parsing and building Ethereum URIs as described in [EIP-681](https://eips.ethereum.org/EIPS/eip-681).
 class EthUrlParser {
-  ///
   /// Parse an Ethereum URI according to ERC-831 and ERC-681
   ///
-  /// @param  {string} uri string.
+  /// Throws an [Exception] if the given [uri] is not a valid Ethereum URI or if
+  /// it cannot be parsed.
   ///
-  /// @return [TransactionRequest]
-  ///
+  /// ```dart
+  /// final TransactionRequest transactionRequest = EthUrlParser.parse(
+  ///   'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD?value=2.014e18&gas=10&gasLimit=21000&gasPrice=50',
+  /// );
+  /// print(transactionRequest.targetAddress); // "0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD"
+  /// ```
   static TransactionRequest parse(String uri) {
     if (uri.substring(0, 9) != 'ethereum:') {
       throw Exception('Not an Ethereum URI');
@@ -88,12 +93,28 @@ class EthUrlParser {
     return TransactionRequest.fromJson(obj);
   }
 
+  /// Builds an Ethereum URI from a [TransactionRequest] object.
   ///
-  /// Builds a valid Ethereum URI based on the initial parameters
-  /// @param  [TransactionRequest]
+  /// The [TransactionRequest] object contains all the necessary information to build the URI,
+  /// such as the scheme, target address, function name, and parameters.
   ///
-  /// @return {string}
+  /// If the [TransactionRequest] object contains any parameters, they will be added to the URI
+  /// as a query string. The amount parameter will be converted to atomic units if necessary.
   ///
+  /// Throws an [Exception] if the amount parameter is invalid.
+  ///
+  /// ```dart
+  /// final transactionRequest = TransactionRequest(
+  ///   scheme: 'ethereum',
+  ///   targetAddress: '0x1234567890123456789012345678901234567890',
+  ///   functionName: 'transfer',
+  ///   parameters: {
+  ///     'value': '1.23',
+  ///     'address': '0x0987654321098765432109876543210987654321',
+  ///   },
+  /// );
+  /// final uri = EthUrlParser.build(transactionRequest);
+  /// ```
   static String build(TransactionRequest transactionRequest) {
     dynamic query;
     if (transactionRequest.parameters.isNotEmpty) {
