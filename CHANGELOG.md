@@ -1,3 +1,9 @@
+# 0.0.5
+
+## Updates
+
+- dartdoc
+
 # 0.0.4
 
 ## Updates
