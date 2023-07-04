@@ -1,3 +1,10 @@
+# 0.0.6
+
+## Updates
+
+- Update all outdated dependencies
+- Add DartDoc comments to model `TransactionRequest`
+
 # 0.0.5
 
 ## Updates
