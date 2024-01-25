@@ -1,3 +1,9 @@
+# 0.0.7
+
+## Updates
+
+- Upgrade dependencies
+
 # 0.0.6
 
 ## Updates
