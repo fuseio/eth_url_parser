@@ -1,46 +1,49 @@
 # eth_url_parser
 
-eth_url_parser is translated from https://www.npmjs.com/package/eth-url-parser
+A Dart library for parsing and building Ethereum URLs according to [ERC-681](https://eips.ethereum.org/EIPS/eip-681) and [ERC-831](https://eips.ethereum.org/EIPS/eip-831).
 
-Module that supports parsing / parsing of all the different ethereum standard urls: [ERC-681](https://eips.ethereum.org/EIPS/eip-681) and [ERC-831](https://eips.ethereum.org/EIPS/eip-831)
+Translated from the JavaScript [eth-url-parser](https://www.npmjs.com/package/eth-url-parser) package.
 
-This module contains two functions:
+## Features
 
-## `EthUrlParser.parse(string)`
+- Parse Ethereum URIs into strongly-typed `TransactionRequest` objects
+- Build valid Ethereum URIs from `TransactionRequest` objects
+- Supports ERC-681 parameters: `value`, `gas`, `gasLimit`, `gasPrice`
+- Supports ERC-20 `transfer` function calls
+- ENS name resolution support
+- Chain ID support
+- No code generation required -- pure Dart
 
-Takes in a string of an Ethereum URL and returns an object matching that URL according to the previously mentioned standards
-The returned object looks like this:
+## Installation
 
-```dart
-TransactionRequest(
-  scheme: 'ethereum',
-  targetAddress: '0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD', // ENS names are also supported!
-  functionName: 'transfer',
-  chainId: 1,
-  parameters: {
-    'value': '2014000000000000000', // (in WEI)
-    'gas': '45000', // can be also gasLimit
-    'gasPrice': '50',
-  },
-)
+Add to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  eth_url_parser: ^0.1.0
 ```
 
-## `EthUrlParser.build(TransactionRequest transactionRequest)`
-
-Takes in an object representing the different parts of the ethereum url and returns a string representing a valid ethereum url
-
 ## Usage
+
+### Parsing an Ethereum URL
 
 ```dart
 import 'package:eth_url_parser/eth_url_parser.dart';
 
-final TransactionRequest transactionRequest = EthUrlParser.parse(
-  'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD',
+final request = EthUrlParser.parse(
+  'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD?value=2.014e18&gas=45000',
 );
-print(transactionRequest.targetAddress);
-// '0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD'
+print(request.targetAddress); // 0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD
+print(request.parameters['value']); // 2014000000000000000
+print(request.parameters['gas']); // 45000
+```
 
-final String uri = EthUrlParser.build(
+### Building an Ethereum URL
+
+```dart
+import 'package:eth_url_parser/eth_url_parser.dart';
+
+final uri = EthUrlParser.build(
   TransactionRequest(
     targetAddress: '0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD',
     functionName: 'transfer',
@@ -50,7 +53,33 @@ final String uri = EthUrlParser.build(
     },
   ),
 );
-print('$uri');
-// 'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD/transfer?address=0x12345&uint256=1'
-
+print(uri);
+// ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD/transfer?address=0x12345&uint256=1
 ```
+
+### The `TransactionRequest` model
+
+```dart
+TransactionRequest(
+  scheme: 'ethereum',       // default
+  targetAddress: '0x...',   // required
+  functionName: 'transfer', // optional
+  prefix: 'pay',           // optional (ERC-831)
+  chainId: 1,              // optional
+  parameters: {             // optional
+    'value': '1000000000000000000',
+    'gas': '21000',
+  },
+)
+```
+
+## API Reference
+
+### `EthUrlParser.parse(String uri)`
+
+Parses an Ethereum URI string and returns a `TransactionRequest`.
+Throws an `Exception` for invalid URIs.
+
+### `EthUrlParser.build(TransactionRequest request)`
+
+Builds an Ethereum URI string from a `TransactionRequest` object.

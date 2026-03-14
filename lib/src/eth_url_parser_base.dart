@@ -1,5 +1,3 @@
-library eth_url_parser;
-
 import 'package:eth_url_parser/src/models/transaction_request.dart';
 import 'package:eth_url_parser/src/query_string.dart';
 
@@ -47,9 +45,8 @@ class EthUrlParser {
       throw Exception("Couldn't not parse the url");
     }
 
-    dynamic parameters = uri.split('?');
-    parameters = parameters.length > 1 ? parameters[1] : '';
-    Map<dynamic, dynamic> params = QueryString.parse(parameters);
+    final String paramString = uri.contains('?') ? uri.split('?')[1] : '';
+    final Map<String, String> params = QueryString.parse(paramString);
 
     final Map<String, dynamic> obj = {
       'scheme': 'ethereum',
@@ -72,15 +69,15 @@ class EthUrlParser {
       obj.putIfAbsent('parameters', () => Map<String, dynamic>.from(params));
       final amountKey = obj['functionName'] == 'transfer' ? 'uint256' : 'value';
 
-      if (obj['parameters'][amountKey] != null) {
-        final num amount = num.parse(obj['parameters'][amountKey]);
+      if ((obj['parameters'] as Map)[amountKey] != null) {
+        final num amount = num.parse((obj['parameters'] as Map)[amountKey]);
         String value;
         if (amount.toString().endsWith('.0')) {
           value = amount.toString().split('.').first;
         } else {
           value = amount.toString();
         }
-        obj['parameters'][amountKey] = value;
+        (obj['parameters'] as Map)[amountKey] = value;
         if (!amount.toDouble().isFinite) {
           throw Exception('Invalid amount');
         }
@@ -116,7 +113,7 @@ class EthUrlParser {
   /// final uri = EthUrlParser.build(transactionRequest);
   /// ```
   static String build(TransactionRequest transactionRequest) {
-    dynamic query;
+    String? query;
     if (transactionRequest.parameters.isNotEmpty) {
       final amountKey =
           transactionRequest.functionName == 'transfer' ? 'uint256' : 'value';
