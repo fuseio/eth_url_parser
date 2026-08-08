@@ -612,7 +612,8 @@ void main() {
     });
 
     test('build(parse(uri)) preserves the spec example URI', () {
-      const uri = 'ethereum:0xfb6916095ca1df60bB79Ce92cE3Ea74c37c5d359?value=2.014e18';
+      const uri =
+          'ethereum:0xfb6916095ca1df60bB79Ce92cE3Ea74c37c5d359?value=2.014e18';
       expect(EthUrlParser.build(EthUrlParser.parse(uri)), uri);
     });
   });

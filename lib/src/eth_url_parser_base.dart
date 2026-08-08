@@ -176,8 +176,7 @@ class EthUrlParser {
         final BigInt amount =
             _parseNumber(transactionRequest.parameters[amountKey] as String);
         if (amount < BigInt.zero) {
-          throw FormatException(
-              'Invalid amount: $amount must not be negative');
+          throw FormatException('Invalid amount: $amount must not be negative');
         }
         transactionRequest = transactionRequest.copyWith(
           parameters: Map.from({
@@ -203,8 +202,8 @@ class EthUrlParser {
   static String _formatNumber(BigInt amount) {
     final digits = amount.toString();
     var zeros = 0;
-    while (zeros < digits.length - 1 &&
-        digits[digits.length - 1 - zeros] == '0') {
+    while (
+        zeros < digits.length - 1 && digits[digits.length - 1 - zeros] == '0') {
       zeros++;
     }
     if (zeros < 3) {
