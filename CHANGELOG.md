@@ -24,6 +24,10 @@ silent precision loss on the money path.
   `+` is a literal plus (the number grammar's sign), not a space
 - Validated `chainId` as decimal digits and the `transfer` `address`
   parameter as a valid address or ENS name
+- **Breaking**: `EthUrlParser` and `QueryString` can no longer be
+  instantiated — both are static-only utility classes
+- 100% dartdoc coverage of the public API, enforced by the
+  `public_member_api_docs` lint and strict analyzer language checks
 
 ## 0.1.0
 

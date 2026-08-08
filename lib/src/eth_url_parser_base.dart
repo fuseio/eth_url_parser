@@ -3,10 +3,18 @@ import 'package:eth_url_parser/src/query_string.dart';
 
 /// A Dart library for parsing and building Ethereum URIs as described in [EIP-681](https://eips.ethereum.org/EIPS/eip-681).
 class EthUrlParser {
-  /// Parse an Ethereum URI according to ERC-831 and ERC-681
+  // Static-only utility class; not meant to be instantiated.
+  EthUrlParser._();
+
+  /// Parses an Ethereum URI according to EIP-681.
   ///
-  /// Throws an [Exception] if the given [uri] is not a valid Ethereum URI or if
-  /// it cannot be parsed.
+  /// Amounts (`value`, or `uint256` for `transfer` calls, plus `gas`,
+  /// `gasLimit` and `gasPrice`) are normalized to plain decimal wei strings
+  /// using exact [BigInt] math, so scientific notation like `2.014e18` never
+  /// loses precision.
+  ///
+  /// Throws a [FormatException] if the given [uri] is not a valid EIP-681
+  /// Ethereum URI.
   ///
   /// ```dart
   /// final TransactionRequest transactionRequest = EthUrlParser.parse(
@@ -143,10 +151,13 @@ class EthUrlParser {
   /// The [TransactionRequest] object contains all the necessary information to build the URI,
   /// such as the scheme, target address, function name, and parameters.
   ///
-  /// If the [TransactionRequest] object contains any parameters, they will be added to the URI
-  /// as a query string. The amount parameter will be converted to atomic units if necessary.
+  /// If the [TransactionRequest] object contains any parameters, they will be
+  /// added to the URI as a query string. Amounts with at least three trailing
+  /// zeros are emitted in the exponent notation EIP-681 suggests (`2.014e18`);
+  /// all others stay plain decimal, so round-trips never lose a wei.
   ///
-  /// Throws an [Exception] if the amount parameter is invalid.
+  /// Throws a [FormatException] if the prefix, target address, or amount is
+  /// invalid.
   ///
   /// ```dart
   /// final transactionRequest = TransactionRequest(
@@ -154,8 +165,8 @@ class EthUrlParser {
   ///   targetAddress: '0x1234567890123456789012345678901234567890',
   ///   functionName: 'transfer',
   ///   parameters: {
-  ///     'value': '1.23',
   ///     'address': '0x0987654321098765432109876543210987654321',
+  ///     'uint256': '1000000000000000000',
   ///   },
   /// );
   /// final uri = EthUrlParser.build(transactionRequest);
