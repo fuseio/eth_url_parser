@@ -10,12 +10,12 @@ void main() {
 
   // Parse a URL with parameters
   final transferRequest = EthUrlParser.parse(
-    'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD/transfer?address=0xABCD&uint256=1',
+    'ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD/transfer?address=0x8e23ee67d1332ad560396262c48ffbb01f93d052&uint256=1',
   );
   print('Function: ${transferRequest.functionName}');
   // Function: transfer
   print('Parameters: ${transferRequest.parameters}');
-  // Parameters: {address: 0xABCD, uint256: 1}
+  // Parameters: {address: 0x8e23ee67d1332ad560396262c48ffbb01f93d052, uint256: 1}
 
   // Build an Ethereum URL from a TransactionRequest
   final uri = EthUrlParser.build(
@@ -24,11 +24,11 @@ void main() {
       functionName: 'transfer',
       chainId: 1,
       parameters: {
-        'address': '0xABCD',
+        'address': '0x8e23ee67d1332ad560396262c48ffbb01f93d052',
         'uint256': '1',
       },
     ),
   );
   print('Built URI: $uri');
-  // Built URI: ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD@1/transfer?address=0xABCD&uint256=1
+  // Built URI: ethereum:0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD@1/transfer?address=0x8e23ee67d1332ad560396262c48ffbb01f93d052&uint256=1
 }
