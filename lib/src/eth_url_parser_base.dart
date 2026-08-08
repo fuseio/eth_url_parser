@@ -15,79 +15,127 @@ class EthUrlParser {
   /// print(transactionRequest.targetAddress); // "0x1234DEADBEEF5678ABCD1234DEADBEEF5678ABCD"
   /// ```
   static TransactionRequest parse(String uri) {
-    if (uri.substring(0, 9) != 'ethereum:') {
-      throw Exception('Not an Ethereum URI');
+    if (!uri.startsWith('ethereum:')) {
+      throw const FormatException('Not an Ethereum URI');
     }
+    var rest = uri.substring('ethereum:'.length);
 
+    // EIP-681: schema_prefix = "ethereum" ":" [ "pay-" ] — "pay" is the only
+    // prefix the spec defines. Anything else is part of the target (ENS).
     String? prefix;
-    String addressRegex = '(0x[\\w]{40})';
+    if (rest.startsWith('pay-')) {
+      prefix = 'pay';
+      rest = rest.substring('pay-'.length);
+    }
 
-    if (uri.substring(9, 11).toLowerCase() == '0x') {
-      prefix = null;
-    } else {
-      final cutOff = uri.indexOf('-', 9);
-      if (cutOff == -1) {
-        throw Exception('Missing prefix');
-      }
-      prefix = uri.substring(9, cutOff);
-      final rest = uri.substring(cutOff + 1);
-      if (rest.substring(0, 2).toLowerCase() != '0x') {
-        addressRegex =
-            '([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9].[a-zA-Z]{2,})';
+    String paramString = '';
+    final queryIndex = rest.indexOf('?');
+    if (queryIndex != -1) {
+      paramString = rest.substring(queryIndex + 1);
+      rest = rest.substring(0, queryIndex);
+    }
+
+    String? functionName;
+    final slashIndex = rest.indexOf('/');
+    if (slashIndex != -1) {
+      functionName = Uri.decodeComponent(rest.substring(slashIndex + 1));
+      rest = rest.substring(0, slashIndex);
+      if (functionName.isEmpty) {
+        throw const FormatException('Empty function name');
       }
     }
 
-    final fullRegex =
-        '^ethereum:($prefix-)?$addressRegex\\@?([\\w]*)*\\/?([\\w]*)*';
-    final exp = RegExp(fullRegex);
-    final List<RegExpMatch> data = exp.allMatches(uri).toList();
-    if (data.isEmpty) {
-      throw Exception("Couldn't not parse the url");
+    int? chainId;
+    final atIndex = rest.indexOf('@');
+    if (atIndex != -1) {
+      final chainIdString = rest.substring(atIndex + 1);
+      rest = rest.substring(0, atIndex);
+      // chain_id = 1*DIGIT
+      if (!RegExp(r'^\d+$').hasMatch(chainIdString)) {
+        throw FormatException('Invalid chain id: $chainIdString');
+      }
+      chainId = int.parse(chainIdString);
     }
 
-    final String paramString = uri.contains('?') ? uri.split('?')[1] : '';
+    final targetAddress = _validateTargetAddress(rest);
+
     final Map<String, String> params = QueryString.parse(paramString);
+    final Map<String, dynamic> parameters = Map<String, dynamic>.from(params);
 
-    final Map<String, dynamic> obj = {
-      'scheme': 'ethereum',
-      'targetAddress': data[0].group(2),
-    };
-
-    if (prefix != null) {
-      obj.putIfAbsent('prefix', () => prefix);
-    }
-
-    if (data[0].group(3) != null) {
-      obj.putIfAbsent('chainId', () => int.parse(data[0].group(3)!));
-    }
-
-    if (data[0].group(4) != null) {
-      obj.putIfAbsent('functionName', () => data[0].group(4));
-    }
-
-    if (params.isNotEmpty) {
-      obj.putIfAbsent('parameters', () => Map<String, dynamic>.from(params));
-      final amountKey = obj['functionName'] == 'transfer' ? 'uint256' : 'value';
-
-      if ((obj['parameters'] as Map)[amountKey] != null) {
-        final num amount = num.parse((obj['parameters'] as Map)[amountKey]);
-        String value;
-        if (amount.toString().endsWith('.0')) {
-          value = amount.toString().split('.').first;
-        } else {
-          value = amount.toString();
+    final amountKey = functionName == 'transfer' ? 'uint256' : 'value';
+    for (final key in [amountKey, 'gas', 'gasLimit', 'gasPrice']) {
+      final raw = parameters[key];
+      if (raw != null) {
+        final BigInt amount = _parseNumber(raw as String);
+        if (amount < BigInt.zero) {
+          throw FormatException('Invalid amount: $raw must not be negative');
         }
-        (obj['parameters'] as Map)[amountKey] = value;
-        if (!amount.toDouble().isFinite) {
-          throw Exception('Invalid amount');
-        }
-        if (amount < 0) {
-          throw Exception('Invalid amount');
-        }
+        parameters[key] = amount.toString();
       }
     }
+    if (parameters['address'] != null) {
+      _validateTargetAddress(parameters['address'] as String);
+    }
 
-    return TransactionRequest.fromJson(obj);
+    return TransactionRequest(
+      scheme: 'ethereum',
+      targetAddress: targetAddress,
+      prefix: prefix,
+      chainId: chainId,
+      functionName: functionName,
+      parameters: parameters,
+    );
+  }
+
+  /// EIP-681: ethereum_address = ( "0x" 40*HEXDIG ) / ENS_NAME.
+  ///
+  /// Hexadecimal addresses take precedence over ENS names, so a target
+  /// starting with 0x that is not a valid address is an error — never an ENS
+  /// fallback. Addresses are 20 bytes, i.e. exactly 40 hex digits.
+  static String _validateTargetAddress(String target) {
+    if (target.startsWith('0x') || target.startsWith('0X')) {
+      if (!RegExp(r'^0[xX][0-9a-fA-F]{40}$').hasMatch(target)) {
+        throw FormatException('Invalid Ethereum address: $target');
+      }
+      return target;
+    }
+    // The spec leaves ENS_NAME open; require dot-separated non-empty labels
+    // of [a-zA-Z0-9-] that don't start or end with a dash.
+    final label = '[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?';
+    if (!RegExp('^$label(\\.$label)+\$').hasMatch(target)) {
+      throw FormatException(
+          'Invalid target: $target is neither an Ethereum address nor an ENS name');
+    }
+    return target;
+  }
+
+  /// Parses the EIP-681 number grammar exactly, with no precision loss:
+  ///
+  ///     number = [ "-" / "+" ] *DIGIT [ "." 1*DIGIT ] [ ( "e" / "E" ) [ 1*DIGIT ] ]
+  ///
+  /// Only integer numbers are allowed, so the exponent must be greater than
+  /// or equal to the number of decimals after the point.
+  static BigInt _parseNumber(String input) {
+    final match =
+        RegExp(r'^([+-]?)(\d*)(?:\.(\d+))?(?:[eE](\d*))?$').firstMatch(input);
+    if (match == null) {
+      throw FormatException('Invalid number: $input');
+    }
+    final integerDigits = match.group(2)!;
+    final decimalDigits = match.group(3) ?? '';
+    if (integerDigits.isEmpty && decimalDigits.isEmpty) {
+      throw FormatException('Invalid number: $input');
+    }
+    final exponent = int.parse('0${match.group(4) ?? ''}');
+    if (exponent < decimalDigits.length) {
+      throw FormatException(
+          'Invalid number: $input — the exponent must be greater or equal to '
+          'the number of decimals after the point');
+    }
+    final digits = BigInt.parse('0$integerDigits$decimalDigits');
+    final magnitude =
+        digits * BigInt.from(10).pow(exponent - decimalDigits.length);
+    return match.group(1) == '-' ? -magnitude : magnitude;
   }
 
   /// Builds an Ethereum URI from a [TransactionRequest] object.
@@ -113,31 +161,30 @@ class EthUrlParser {
   /// final uri = EthUrlParser.build(transactionRequest);
   /// ```
   static String build(TransactionRequest transactionRequest) {
+    if (transactionRequest.prefix != null &&
+        transactionRequest.prefix != 'pay') {
+      throw FormatException(
+          'Invalid prefix: ${transactionRequest.prefix} — EIP-681 only defines "pay-"');
+    }
+    _validateTargetAddress(transactionRequest.targetAddress);
+
     String? query;
     if (transactionRequest.parameters.isNotEmpty) {
       final amountKey =
           transactionRequest.functionName == 'transfer' ? 'uint256' : 'value';
       if (transactionRequest.parameters[amountKey] != null) {
-        // This is weird. Scientific notation in JS is usually 2.014e+18
-        // but the EIP 681 shows no "+" sign ¯\_(ツ)_/¯
-        // source: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-681.md#semantics
-        final num amount = num.parse(transactionRequest.parameters[amountKey]);
-        final String atomicUnits = amount
-            .toStringAsExponential()
-            .replaceAll('+', '')
-            .replaceAll('e0', '');
+        final BigInt amount =
+            _parseNumber(transactionRequest.parameters[amountKey] as String);
+        if (amount < BigInt.zero) {
+          throw FormatException(
+              'Invalid amount: $amount must not be negative');
+        }
         transactionRequest = transactionRequest.copyWith(
           parameters: Map.from({
             ...transactionRequest.parameters,
-            amountKey: atomicUnits,
+            amountKey: _formatNumber(amount),
           }),
         );
-        if (!amount.toDouble().isFinite) {
-          throw Exception('Invalid amount');
-        }
-        if (amount < 0) {
-          throw Exception('Invalid amount');
-        }
       }
       query = Uri(
         queryParameters: transactionRequest.parameters,
@@ -147,5 +194,27 @@ class EthUrlParser {
         '${transactionRequest.scheme}:${transactionRequest.prefix != null ? '${transactionRequest.prefix}-' : ''}${transactionRequest.targetAddress}${transactionRequest.chainId != null ? '@${transactionRequest.chainId}' : ''}${transactionRequest.functionName != null ? '/${transactionRequest.functionName}' : ''}${query ?? ''}';
 
     return uri;
+  }
+
+  /// Formats an amount losslessly, preferring the exponent notation EIP-681
+  /// suggests: trailing zeros compress into an exponent (2014000000000000000
+  /// becomes 2.014e18); a number they can't compress stays plain decimal, so
+  /// no wei is ever dropped. The EIP shows exponents without a '+' sign.
+  static String _formatNumber(BigInt amount) {
+    final digits = amount.toString();
+    var zeros = 0;
+    while (zeros < digits.length - 1 &&
+        digits[digits.length - 1 - zeros] == '0') {
+      zeros++;
+    }
+    if (zeros < 3) {
+      return digits;
+    }
+    final mantissa = digits.substring(0, digits.length - zeros);
+    final exponent = digits.length - 1;
+    if (mantissa.length == 1) {
+      return '${mantissa}e$exponent';
+    }
+    return '${mantissa[0]}.${mantissa.substring(1)}e$exponent';
   }
 }

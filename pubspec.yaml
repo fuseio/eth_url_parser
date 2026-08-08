@@ -1,7 +1,7 @@
 name: eth_url_parser
 description: A Dart library for parsing and building Ethereum URLs according to
-  ERC-681 and ERC-831. Supports ERC-20 transfers, ENS names, and chain IDs.
-version: 0.1.0
+  ERC-681. Supports ERC-20 transfers, ENS names, and chain IDs.
+version: 0.2.0
 repository: https://github.com/fuseio/eth_url_parser
 homepage: https://fuse.io
 topics:
