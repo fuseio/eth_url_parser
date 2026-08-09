@@ -13,11 +13,15 @@
 
 include: package:lints/recommended.yaml
 
-# Uncomment the following section to specify additional rules.
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
 
-# linter:
-#   rules:
-#     - camel_case_types
+linter:
+  rules:
+    - public_member_api_docs
 
 # For more information about the core and recommended set of lints, see
 # https://dart.dev/go/core-lints
